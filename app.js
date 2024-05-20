@@ -1,37 +1,33 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const cookieParser = require('cookie-parser');
 const session = require('express-session');
-const bcrypt = require('bcrypt');
+const MongoStore = require('connect-mongo');
+const authRoutes = require('./routes/auth');
 
 const app = express();
-app.use(express.json());
 
+app.use(express.json());
+app.use(cookieParser());
 app.use(session({
-    secret: 'bigapple',
+    secret: 'mySecretKey',
     resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false }
+    saveUninitialized: false,
+    store: MongoStore.create({ mongoUrl: 'mongodb://localhost:27017/myapp' }),
+    cookie: { maxAge: 1000 * 60 * 60 * 24 }
 }));
 
-
-const users = [
-    { id: 1, username: 'user1', password: bcrypt.hashSync('Password123', 10) } 
-];
-
-
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-    const user = users.find(u => u.username === username);
-    if (user && bcrypt.compareSync(password, user.password)) {
-        req.session.userId = user.id;
-        res.status(200).send('Login required');
-    } else {
-        res.status(401).send('Authentication failed');
-    }
+mongoose.connect('mongodb://localhost:27017/myapp')
+    .then(() => {
+        console.log('MongoDB connected');
+    })
+    .catch(err => {
+        console.error('MongoDB connection error', err);
+    });
+    
+app.use('/api/auth', authRoutes);
+    
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
-
-app.post('/logout', (req, res) => {
-    req.session.destroy();
-    res.status(200).send('Logout successful');
-});
-
-module.exports = app;
